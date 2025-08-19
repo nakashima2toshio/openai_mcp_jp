@@ -22,6 +22,8 @@ def main():
     )
 
     # ヘッダー
+    st.write("docker-compose起動後")
+    st.write("streamlit run openai_api_mcp_sample.py --server.port=8501")
     st.markdown("<h5>🤖 MCP サーバー × OpenAI API デモ</h5>", unsafe_allow_html=True)
     st.markdown("---")
 

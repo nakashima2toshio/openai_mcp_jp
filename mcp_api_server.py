@@ -1,4 +1,4 @@
-# mcp_api_server.py
+# [Usage:] mcp_api_server.pyのmainを起動
 # MCP API Server - FastAPIベースのRESTful APIサーバー
 # README_api.mdとmcp_api_client.pyの内容から推測した実装
 

@@ -1,6 +1,37 @@
-# 自然言語で各種サーバを利用する＝MCPサーバー
+### Start Server
+docker-compose起動 →
+[各サーバの起動、データの確認]
+streamlit run openai_api_mcp_sample.py --server.port=8501
+
+[各サーバのヘルスチェック]
+streamlit run mcp_api_streamlit_app.py --server.port=8502
+
+[各サーバーの起動：FastAPI]
+python mcp_api_server.py
+
+[各サーバーへクライアントからのアクセス]
+python mcp_api_client.py
+
+./setup_env.sh →
+python setup_api.py →
+python mcp_api_server.py
+uv run streamlit run a_mcp_sample.py --server.port=8501
+
+
+cd docker-compose
+
+[docker-compose Stop]
+docker-compose -f docker-compose.mcp-demo.yml down
+
+[docker-compose start]
+docker-compose -f docker-compose.mcp-demo.yml up -d
+
+[docker-compose ps]
+docker-compose -f docker-compose.mcp-demo.yml ps
+
+### 自然言語で各種サーバを利用する＝MCPサーバー
 ![start_img.png](assets/start_img.png)
-# 🎯 実装した主要機能(PostgeSQL MCP)
+### 🎯 実装した主要機能(PostgeSQL MCP)
 
 | エンドポイント | メソッド | 説明 |
 |---|---|---|
@@ -18,11 +49,16 @@
 
 ## OpenAI Responses API × MCP（Model Context Protocol）
 
-**Python / Docker / Docker Compose 前提での導入手順と連携例（改良版）**
+**Python / Docker / Docker Compose 前提での導入手順と連携例 **
 
 - pip install -r requirements.txt
 
-> **重要:** OpenAI **Responses API** から MCP を使うには、`server_url` で到達できる **Remote MCP（HTTP / SSE）** としてサーバを公開する必要があります。`stdio` 専用の MCP はそのままでは使えません（`stdio → HTTP/SSE` ブリッジが必要）。以下は学習・検証向けの雛形です。実際のオプション・起動方法は各リポジトリの README の最新版に従ってください。
+> **重要:**
+- OpenAI **Responses API** から MCP を使うには、
+- `server_url` で到達できる **Remote MCP（HTTP / SSE）** としてサーバを公開する必要があります。
+- `stdio` 専用の MCP はそのままでは使えません
+- （`stdio → HTTP/SSE` ブリッジが必要）。
+- 以下は学習・検証向けの雛形です。実際のオプション・起動方法は各リポジトリの README の最新版に従ってください。
 
 ---
 

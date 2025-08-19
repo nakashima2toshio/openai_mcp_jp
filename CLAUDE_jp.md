@@ -9,49 +9,50 @@
 ## 主要なアーキテクチャコンポーネント
 
 ### コアアプリケーション
-- **openai_api_mcp_sample.py** - メインのStreamlitアプリケーションエントリーポイント (11行目: `from helper_mcp import MCPApplication`)
-- **mcp_api_server.py** - MCP操作用のFastAPIベースのRESTサーバー (19行目: `app = FastAPI`)
-- **mcp_api_client.py** - MCP APIサーバーとの相互作用用クライアントライブラリ (14行目: `class MCPAPIClient`)
-- **mcp_api_streamlit_app.py** - MCP APIクライアントのStreamlit化アプリ（9つのデモ機能を含む）
+- **openai_api_mcp_sample.py** - メインのStreamlitアプリケーションエントリーポイント (helper_mcp.py:MCPApplication)
+- **mcp_api_server.py** - MCP操作用のFastAPIベースのRESTサーバー (FastAPIアプリインスタンス)
+- **mcp_api_client.py** - MCP APIサーバーとの相互作用用クライアントライブラリ (MCPAPIClientクラス)
 
 ### ヘルパーモジュール
 - **helper_mcp.py** - コアMCP機能、データベース接続、アプリケーションロジック
-- **helper_api.py** - OpenAI API統合、設定管理、レスポンス処理
+- **helper_api.py** - OpenAI API統合、ConfigManagerシングルトンによるYAML設定管理
 - **helper_st.py** - Streamlit UIコンポーネントとインターフェースヘルパー
 - **helper_mcp_pages.py** - マルチページStreamlitアプリのページ管理
 
 ### データベースサポート
 プロジェクトは複数のデータベースバックエンドをサポートしています：
-- PostgreSQL (psycopg2-binary)
-- Redis
-- Elasticsearch
-- Qdrant (ベクトルデータベース)
+- **PostgreSQL** - プライマリリレーショナルデータベース（スキーマ）:
+  - `customers` (id, name, email, age, city, created_at)
+  - `orders` (id, customer_id, product_name, price, quantity, order_date)
+  - `products` (id, name, category, price, stock_quantity, description)
+- **Redis** - キャッシュとセッションストレージ
+- **Elasticsearch** - ドキュメント検索とインデックス
+- **Qdrant** - 埋め込みと類似度検索用ベクトルデータベース
 
 ## 共通開発コマンド
 
 ### 環境セットアップ
 ```bash
-# 依存関係インストールを含む初期セットアップ
+# 依存関係インストールを含む初期セットアップ（uv/pipを自動検出）
 ./setup_env.sh
 
 # 手動で依存関係をインストール
 pip install -r requirements.txt
-# または uv を使用（利用可能な場合）
-uv add streamlit openai python-dotenv pandas numpy requests redis psycopg2-binary elasticsearch qdrant-client watchdog plotly
+# または uv を使用（利用可能な場合推奨）
+uv sync
 ```
 
 ### アプリケーションの実行
 ```bash
-# Streamlitアプリケーション（メイン）を開始
+# Streamlitアプリケーションを開始
 streamlit run openai_api_mcp_sample.py --server.port=8501
+# または uv を使用
+uv run streamlit run openai_api_mcp_sample.py --server.port=8501
 
-# Streamlitアプリケーション（APIデモ）を開始
-streamlit run mcp_api_streamlit_app.py --server.port=8502
-
-# FastAPIサーバーを開始
-uvicorn mcp_api_server:app --host 0.0.0.0 --port 8000 --reload
-# またはスクリプトを使用
+# FastAPIサーバーを開始（推奨）
 ./start_api.sh
+# または手動で
+uvicorn mcp_api_server:app --host 0.0.0.0 --port 8000 --reload
 ```
 
 ### データベースとインフラストラクチャ
@@ -75,8 +76,9 @@ python quick_test.py
 # データベース接続をチェック
 ./check_server/check_qdrant.sh
 
-# APIサーバーヘルスチェック (helper_api.py:33)
-# クライアントには初期化時にヘルスチェックが含まれています (mcp_api_client.py:33)
+# ヘルスチェックは起動時に自動実行
+# APIサーバー: /health エンドポイント
+# クライアント: 初期化時の自動ヘルスチェック
 ```
 
 ## 設定
@@ -88,13 +90,30 @@ python quick_test.py
 - `REDIS_URL` - Redis接続URL（デフォルト: `redis://localhost:6379/0`）
 - `ELASTIC_URL` - Elasticsearch URL（デフォルト: `http://localhost:9200`）
 - `QDRANT_URL` - Qdrant URL（デフォルト: `http://localhost:6333`）
-- `MCP_API_BASE_URL` - MCP APIサーバーのベースURL（デフォルト: `http://localhost:8000`）
+- `PINECONE_API_KEY` - Pinecone APIキー（オプション）
+
+### モデル設定
+プロジェクトはOpenAIモデルの包括的な設定に`config.yml`を使用：
+- **モデルカテゴリ**: 
+  - frontier (GPT-5シリーズ)
+  - reasoning (o3/o4-mini, o1/o1-pro)
+  - deep_research (o3/o4 深層研究バリアント)
+  - standard (GPT-4o/4.1シリーズ)
+  - vision, audio, realtime, image, search, embeddings
+- **デフォルトモデル**: gpt-4.1 (ConfigManagerシングルトンで設定可能)
+- **音声サポート**: 日本語サポート付き完全なTTS/STTパイプライン
+- **設定管理**: helper_api.py:ConfigManagerシングルトンが価格情報付きYAML設定の読み込みとモデル分類を処理
 
 ### プロジェクト構造
-- `doc/` - ドキュメントとガイド
-- `docker-compose/` - MCPサーバー用のDocker Compose設定
+- `doc/` - 設定、セットアップ、RAGドキュメントを含むドキュメントとガイド
+- `README_doc/` - セットアップ手順、APIドキュメント、Claude Codeガイド
+- `docker-compose/` - MCPデモ環境用のDocker Compose設定
+  - `init-data/` - データベース初期化スクリプト
 - `check_server/` - サーバーヘルスチェックスクリプト
-- `assets/` - 画像を含む静的アセット
+- `assets/` - アプリケーションスクリーンショットを含む静的アセット
+- `helper_*.py` - コアアプリケーションロジックモジュール
+- `mcp_api_*.py` - MCP APIサーバーとクライアント実装
+- `setup_*.py` - 環境とデータセットアップスクリプト
 
 ## MCP統合パターン
 
@@ -104,61 +123,54 @@ python quick_test.py
 3. `helper_mcp.py`がMCPプロトコルを通じて異なるデータベース操作を調整
 4. UIアプリケーション（Streamlit）がMCP操作用の対話的インターフェースを提供
 
-## アプリケーション機能
+### MCPサーバーエンドポイント
+Docker Composeセットアップを実行すると、MCPサーバーは以下のポートで公開されます：
+- Redis MCP: `http://localhost:8000/mcp`
+- PostgreSQL MCP: `http://localhost:8001/mcp`
+- Elasticsearch MCP: `http://localhost:8002/mcp`
+- Qdrant MCP: `http://localhost:8003/mcp`
 
-### openai_api_mcp_sample.py（メインアプリ）
-- 基本的なMCP機能デモ
-- データベース接続管理
-- AI チャット機能
-- サーバー状態監視
+### APIエンドポイント（FastAPIサーバー）
+`mcp_api_server.py`は以下のRESTエンドポイントを提供します：
+- **Health**: `/health` - サーバーヘルスチェック
+- **Customers**: `/api/customers` (GET, POST), `/api/customers/{id}` (GET)
+- **Products**: `/api/products` (GET), `/api/products/{id}` (GET)
+- **Orders**: `/api/orders` (GET, POST)
+- **Analytics**: `/api/stats/sales`, `/api/stats/customers/{id}/orders`
 
-### mcp_api_streamlit_app.py（APIデモアプリ）
-以下の9つのデモ機能を提供：
-1. **ホーム** - システム状態とヘルスチェック
-2. **基本操作** - 顧客・商品・注文データの表示と検索
-3. **売上分析** - 売上統計ダッシュボードとグラフ表示
-4. **顧客分析** - 個別顧客の詳細分析
-5. **データ作成** - 顧客・注文の新規作成フォーム
-6. **データ分析** - Pandas連携データ分析
-7. **エラーテスト** - エラーハンドリング実演
-8. **パフォーマンス** - API応答時間測定
-9. **対話機能** - リアルタイムデータ操作
+## テストと開発
 
-## テスト
+### テストコマンド
+```bash
+# 基本API機能テストを実行
+python quick_test.py
 
-- `quick_test.py` - 基本機能テスト
-- `setup_test_data.py` - データベース用テストデータ生成
-- ヘルスチェックはクライアントクラスに組み込まれています (mcp_api_client.py:33)
+# すべてのデータベース用テストデータを生成
+python setup_test_data.py
+
+# 現実的な例を含むサンプルデータをセットアップ
+python setup_sample_data.py
+
+# Qdrant診断を実行
+python qdrant_diagnostic.py
+```
+
+### 開発のヒント
+- ヘルスチェックはクライアントクラスで自動実行
+- 利用可能な場合は高速な依存関係管理のため`uv`を使用
+- データベース接続は適切なデフォルトで自動リトライ
+- `config.yml`による設定は開発環境でのホットリロードをサポート
 
 ## 依存関係
 
 pyproject.tomlからの主要依存関係：
-- streamlit>=1.48.0 - Web UIフレームワーク
-- openai>=1.99.9 - Responses APIサポート付きOpenAI APIクライアント
-- fastapi>=0.116.1 - REST APIフレームワーク
-- データベースクライアント: psycopg2-binary, redis, elasticsearch, qdrant-client
-- データ処理: pandas, numpy
-- サーバー: uvicorn
-- 可視化: plotly（売上分析グラフ用）
+- **streamlit>=1.48.0** - Web UIフレームワーク
+- **openai>=1.99.9** - Responses APIサポート付きOpenAI APIクライアント
+- **fastapi>=0.116.1** - 自動APIドキュメント付きREST APIフレームワーク
+- **データベースクライアント**: psycopg2-binary, redis, elasticsearch, qdrant-client
+- **データ処理**: pandas, numpy
+- **サーバー**: uvicorn (ASGIサーバー)
+- **開発**: python-dotenv, watchdog
 
-## 開発上の注意点
-
-### 日本語UI対応
-- すべてのStreamlitアプリは日本語UIに対応
-- エラーメッセージも日本語で表示
-- CSVダウンロード時のファイル名は日本語対応（UTF-8 BOM付き）
-
-### エラーハンドリング
-- 包括的なエラー処理が実装済み
-- APIサーバー未接続時の適切なフォールバック
-- ユーザーフレンドリーなエラーメッセージ
-
-### セッション管理
-- Streamlitセッション状態を活用した状態管理
-- ページ間でのデータ永続化
-- 作成履歴の追跡と管理
-
-### パフォーマンス最適化
-- データキャッシングによる応答速度向上
-- 効率的なAPI呼び出しパターン
-- リアルタイム更新機能
+### Pythonバージョン
+Python >=3.12.2が必要

@@ -1,4 +1,4 @@
-# mcp_api_client.py
+# python mcp_api_client.py
 # MCP API サーバーにアクセスするクライアントサンプル
 
 import requests
