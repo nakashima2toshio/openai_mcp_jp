@@ -5,6 +5,11 @@ import streamlit as st
 import os
 from dotenv import load_dotenv
 from typing import Dict, Any, List, Optional
+import pandas as pd
+import time
+import json
+import plotly.express as px
+import plotly.graph_objects as go
 
 # ヘルパーモジュールからインポート
 from helper_mcp import MCPSessionManager, ServerStatusManager, PageManager
@@ -100,10 +105,10 @@ class MCPDemoApplication:
         # 追加情報
         st.sidebar.markdown("---")
         st.sidebar.markdown("### ℹ️ 情報")
-        st.sidebar.info("このアプリはmcp_api_client.pyの9つのデモ機能をStreamlit化したものです。")
-        
+
         # 開発者向け情報
         if st.sidebar.expander("🛠️ 開発者情報"):
+                st.write("Toshioakashima")
             st.sidebar.code(f"API URL: {self.api_base_url}")
             st.sidebar.code(f"接続状態: {st.session_state.api_connected}")
             st.sidebar.code(f"選択ページ: {st.session_state.selected_demo_page}")
