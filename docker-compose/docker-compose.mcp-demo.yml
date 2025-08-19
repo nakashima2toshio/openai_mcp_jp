@@ -60,21 +60,29 @@ services:
       timeout: 5s
       retries: 3
 
-  # === MCP サーバー群（開発中はコメントアウト）===
-  # redis-mcp:
+  # === MCP サーバー群 ===
+  postgres-mcp:
+    build: https://github.com/HenkDz/postgresql-mcp-server.git
+    ports: 
+      - "8001:3000"
+    environment:
+      - PG_CONN_STR=postgresql://testuser:testpass@postgres:5432/testdb
+      - PORT=3000
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000/health"]
+      interval: 15s
+      timeout: 10s
+      retries: 5
+
+  # redis-mcp (オプション):
   #   build: https://github.com/redis/mcp-redis.git
   #   ports: ["8000:8000"]
   #   environment: [REDIS_URL=redis://redis:6379/0]
   #   depends_on:
   #     redis:
-  #       condition: service_healthy
-
-  # postgres-mcp:
-  #   build: https://github.com/HenkDz/postgresql-mcp-server.git
-  #   ports: ["8001:8000"]
-  #   environment: [PG_CONN_STR=postgresql://testuser:testpass@postgres:5432/testdb]
-  #   depends_on:
-  #     postgres:
   #       condition: service_healthy
 
 volumes:

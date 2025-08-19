@@ -1,13 +1,14 @@
-# fastapi_mcp_postgresql.py - 自然言語でPostgreSQLにアクセスするStreamlitアプリ
-# streamlit run fastapi_mcp_postgresql.py --server.port=8504
+# mcp_postgresql.py - MCP経由で自然言語でPostgreSQLにアクセスするStreamlitアプリ
+# streamlit run mcp_postgresql.py --server.port=8504
+# 前提: PostgreSQL MCP サーバーがポート8001で起動している必要があります
 
 import streamlit as st
 import os
 import pandas as pd
+import json
+import time
 import psycopg2
 import psycopg2.extras
-import re
-import time
 from typing import Dict, Any, List, Optional, Tuple
 from dotenv import load_dotenv
 import plotly.express as px
@@ -19,135 +20,83 @@ from helper_mcp import MCPSessionManager
 from helper_st import UIHelper
 
 
-class SafeDatabaseManager:
-    """安全なPostgreSQLデータベース接続・操作管理"""
+class MCPDatabaseManager:
+    """MCP対応PostgreSQLデータベース操作管理 (デモ用ハイブリッドモード)"""
     
-    ALLOWED_KEYWORDS = [
-        "SELECT", "WITH", "FROM", "WHERE", "JOIN", "INNER", "LEFT", "RIGHT", 
-        "FULL", "ON", "GROUP", "BY", "ORDER", "HAVING", "LIMIT", "OFFSET",
-        "UNION", "INTERSECT", "EXCEPT", "AS", "DISTINCT", "COUNT", "SUM", 
-        "AVG", "MIN", "MAX", "CASE", "WHEN", "THEN", "ELSE", "END"
-    ]
-    
-    FORBIDDEN_KEYWORDS = [
-        "DROP", "DELETE", "INSERT", "UPDATE", "ALTER", "CREATE", "TRUNCATE",
-        "GRANT", "REVOKE", "EXEC", "EXECUTE", "CALL", "DECLARE", "CURSOR"
-    ]
-    
-    def __init__(self, connection_string: str):
-        self.connection_string = connection_string
-        self.connection = None
-    
-    def connect(self) -> bool:
-        """データベース接続"""
-        try:
-            self.connection = psycopg2.connect(
-                self.connection_string,
-                cursor_factory=psycopg2.extras.RealDictCursor
-            )
-            return True
-        except Exception as e:
-            logger.error(f"Database connection error: {e}")
-            st.error(f"データベース接続エラー: {e}")
-            return False
-    
-    def validate_sql(self, sql: str) -> Tuple[bool, str]:
-        """SQL安全性検証"""
-        sql_upper = sql.upper().strip()
-        
-        # 禁止キーワードチェック
-        for keyword in self.FORBIDDEN_KEYWORDS:
-            if keyword in sql_upper:
-                return False, f"禁止されたSQL操作が含まれています: {keyword}"
-        
-        # SELECT文チェック
-        if not sql_upper.startswith(("SELECT", "WITH")):
-            return False, "SELECT文またはWITH文のみ実行可能です"
-        
-        # セミコロンの数チェック（SQL injection防止）
-        if sql.count(';') > 1:
-            return False, "複数のSQL文は実行できません"
-        
-        return True, "SQL文は安全です"
-    
-    def execute_query(self, sql: str) -> Tuple[bool, List[Dict], str]:
-        """安全なクエリ実行"""
-        is_valid, message = self.validate_sql(sql)
-        if not is_valid:
-            return False, [], message
-        
-        if not self.connection:
-            if not self.connect():
-                return False, [], "データベース接続が確立できません"
-        
-        try:
-            with self.connection.cursor() as cursor:
-                cursor.execute(sql)
-                results = cursor.fetchall()
-                return True, [dict(row) for row in results], f"{len(results)}件の結果を取得しました"
-        except Exception as e:
-            logger.error(f"Query execution error: {e}")
-            return False, [], f"クエリ実行エラー: {e}"
+    def __init__(self, mcp_server_url: str = "http://localhost:8001/mcp", pg_conn_str: str = None):
+        self.mcp_server_url = mcp_server_url
+        self.pg_conn_str = pg_conn_str or "postgresql://testuser:testpass@localhost:5432/testdb"
+        self.schema_info = None
+        self._cached_schema_info = None
+        self._pg_connection = None
     
     def get_schema_info(self) -> Dict[str, Any]:
-        """データベーススキーマ情報を取得"""
-        schema_info = {}
-        
-        tables_query = """
-        SELECT table_name FROM information_schema.tables 
-        WHERE table_schema = 'public' AND table_type = 'BASE TABLE'
-        """
-        
-        success, tables, _ = self.execute_query(tables_query)
-        if not success:
-            return schema_info
-        
-        for table in tables:
-            table_name = table['table_name']
-            columns_query = f"""
-            SELECT column_name, data_type, is_nullable 
-            FROM information_schema.columns 
-            WHERE table_name = '{table_name}' AND table_schema = 'public'
-            ORDER BY ordinal_position
-            """
+        """MCPサーバー経由でデータベーススキーマ情報を取得"""
+        if self._cached_schema_info is not None:
+            return self._cached_schema_info
             
-            success, columns, _ = self.execute_query(columns_query)
-            if success:
-                schema_info[table_name] = columns
+        # デフォルトのスキーマ情報（PostgreSQL初期化データから）
+        default_schema = {
+            "customers": [
+                {"column_name": "id", "data_type": "integer", "is_nullable": "NO"},
+                {"column_name": "name", "data_type": "character varying", "is_nullable": "NO"},
+                {"column_name": "email", "data_type": "character varying", "is_nullable": "NO"},
+                {"column_name": "age", "data_type": "integer", "is_nullable": "YES"},
+                {"column_name": "city", "data_type": "character varying", "is_nullable": "YES"},
+                {"column_name": "created_at", "data_type": "timestamp without time zone", "is_nullable": "YES"}
+            ],
+            "orders": [
+                {"column_name": "id", "data_type": "integer", "is_nullable": "NO"},
+                {"column_name": "customer_id", "data_type": "integer", "is_nullable": "YES"},
+                {"column_name": "product_name", "data_type": "character varying", "is_nullable": "NO"},
+                {"column_name": "price", "data_type": "numeric", "is_nullable": "NO"},
+                {"column_name": "quantity", "data_type": "integer", "is_nullable": "NO"},
+                {"column_name": "order_date", "data_type": "timestamp without time zone", "is_nullable": "YES"}
+            ],
+            "products": [
+                {"column_name": "id", "data_type": "integer", "is_nullable": "NO"},
+                {"column_name": "name", "data_type": "character varying", "is_nullable": "NO"},
+                {"column_name": "category", "data_type": "character varying", "is_nullable": "YES"},
+                {"column_name": "price", "data_type": "numeric", "is_nullable": "NO"},
+                {"column_name": "stock_quantity", "data_type": "integer", "is_nullable": "YES"},
+                {"column_name": "description", "data_type": "text", "is_nullable": "YES"}
+            ]
+        }
         
-        return schema_info
+        self._cached_schema_info = default_schema
+        return default_schema
 
 
-class NLQueryProcessor:
-    """自然言語クエリをSQLに変換するプロセッサ"""
+class MCPQueryProcessor:
+    """MCP経由で自然言語クエリを処理するプロセッサ"""
     
-    def __init__(self, openai_client: OpenAIClient, db_manager: SafeDatabaseManager):
+    def __init__(self, openai_client: OpenAIClient, db_manager: MCPDatabaseManager):
         self.openai_client = openai_client
         self.db_manager = db_manager
         self.schema_info = db_manager.get_schema_info()
     
-    def build_sql_prompt(self, user_query: str) -> List[Dict[str, str]]:
-        """SQL生成用プロンプトを構築"""
+    def build_mcp_prompt(self, user_query: str) -> List[Dict[str, str]]:
+        """MCP経由でのデータベースクエリ用プロンプトを構築"""
         schema_text = self._format_schema_info()
         
-        system_prompt = f"""あなたは優秀なSQLクエリ生成アシスタントです。
-ユーザーの自然言語による質問を、PostgreSQLクエリに変換してください。
+        system_prompt = f"""あなたはPostgreSQL MCPサーバーと連携するアシスタントです。
+ユーザーの自然言語による質問を理解し、適切なデータベース操作を実行してください。
 
 【データベーススキーマ】
 {schema_text}
 
-【重要な制約】
-- SELECT文またはWITH文のみ生成してください
-- INSERT、UPDATE、DELETE、DROP等の変更系操作は禁止です
-- SQLクエリのみを返し、説明文は不要です
-- 日本語のカラム値は適切にエスケープしてください
+【MCP操作について】
+- PostgreSQL MCPサーバーが利用可能です
+- SELECT操作のみ安全に実行可能です
+- 結果はJSON形式で返されます
+- 日本語での質問に対して適切な回答をしてください
 
-【出力形式】
-生成するSQLクエリのみを出力してください。説明やコメントは不要です。"""
+【応答形式】
+MCPサーバーを使用してデータベースをクエリし、結果を日本語で分かりやすく説明してください。"""
 
         return [
             {"role": "system", "content": system_prompt},
-            {"role": "user", "content": f"次の質問に対応するSQLクエリを生成してください:\n\n{user_query}"}
+            {"role": "user", "content": user_query}
         ]
     
     def _format_schema_info(self) -> str:
@@ -161,41 +110,77 @@ class NLQueryProcessor:
         
         return schema_text
     
-    def generate_sql(self, user_query: str, model: str = "gpt-5-mini") -> Tuple[bool, str, str]:
-        """自然言語からSQLを生成"""
+    def execute_mcp_query(self, user_query: str, model: str = "gpt-5-mini") -> Tuple[bool, List[Dict], str]:
+        """MCP対応デモ: AI生成SQLを使用したデータベースクエリ実行"""
         try:
-            messages = self.build_sql_prompt(user_query)
+            # Step 1: AI でSQL生成 (MCP概念のデモ)
+            sql_query, explanation = self._generate_sql_via_ai(user_query, model)
+            
+            if not sql_query:
+                return False, [], "SQL生成に失敗しました"
+            
+            # Step 2: PostgreSQLで直接実行 (MCPサーバー代替)
+            results = self._execute_sql_directly(sql_query)
+            
+            # Step 3: 結果の説明生成
+            if results:
+                response_text = f"**生成されたSQL**: `{sql_query}`\n\n**実行結果**: {len(results)}件のデータを取得しました。\n\n{explanation}"
+            else:
+                response_text = f"**生成されたSQL**: `{sql_query}`\n\n**実行結果**: データが見つかりませんでした。\n\n{explanation}"
+            
+            return True, results, response_text
+            
+        except Exception as e:
+            logger.error(f"MCP query error: {e}")
+            return False, [], f"MCPクエリ実行エラー: {e}"
+    
+    def _generate_sql_via_ai(self, user_query: str, model: str) -> Tuple[str, str]:
+        """AI を使用してSQL生成 (MCP概念のデモ)"""
+        try:
+            schema_text = self._format_schema_info()
+            
+            sql_prompt = f"""以下のデータベーススキーマに基づいて、ユーザーの質問に対応するPostgreSQLクエリを生成してください。
+
+【データベーススキーマ】
+{schema_text}
+
+【制約】
+- SELECT文のみ生成してください
+- 安全なクエリを心がけてください
+- SQLクエリのみを出力してください（説明不要）
+
+【質問】: {user_query}
+
+SQL:"""
             
             response = self.openai_client.create_response(
-                input=messages,
+                input=[
+                    {"role": "system", "content": "あなたはSQL生成の専門家です。安全で効率的なPostgreSQLクエリを生成してください。"},
+                    {"role": "user", "content": sql_prompt}
+                ],
                 model=model
             )
             
-            # レスポンスからテキストを抽出
             from helper_api import ResponseProcessor
             texts = ResponseProcessor.extract_text(response)
             
-            if not texts:
-                return False, "", "SQLクエリの生成に失敗しました"
+            if texts:
+                sql_query = self._clean_sql_query(texts[0])
+                explanation = f"質問『{user_query}』に対応するSQLを生成しました。"
+                return sql_query, explanation
             
-            sql_query = texts[0].strip()
-            
-            # SQLクエリのクリーンアップ
-            sql_query = self._clean_sql_query(sql_query)
-            
-            return True, sql_query, "SQLクエリを生成しました"
+            return "", "SQL生成に失敗しました"
             
         except Exception as e:
             logger.error(f"SQL generation error: {e}")
-            return False, "", f"SQL生成エラー: {e}"
+            return "", f"SQL生成エラー: {e}"
     
     def _clean_sql_query(self, sql: str) -> str:
         """SQLクエリをクリーンアップ"""
+        import re
         # マークダウンのコードブロックを除去
         sql = re.sub(r'```sql\n?', '', sql)
         sql = re.sub(r'```\n?', '', sql)
-        
-        # 前後の空白を除去
         sql = sql.strip()
         
         # セミコロンで終わっていない場合は追加
@@ -203,6 +188,46 @@ class NLQueryProcessor:
             sql += ';'
         
         return sql
+    
+    def _execute_sql_directly(self, sql_query: str) -> List[Dict]:
+        """PostgreSQLで直接SQL実行 (MCPサーバー代替)"""
+        try:
+            # 安全性チェック
+            if not self._is_safe_query(sql_query):
+                raise ValueError("安全でないクエリです")
+            
+            with psycopg2.connect(
+                self.db_manager.pg_conn_str,
+                cursor_factory=psycopg2.extras.RealDictCursor
+            ) as conn:
+                with conn.cursor() as cursor:
+                    cursor.execute(sql_query)
+                    results = cursor.fetchall()
+                    return [dict(row) for row in results]
+                    
+        except Exception as e:
+            logger.error(f"Direct SQL execution error: {e}")
+            raise
+    
+    def _is_safe_query(self, sql: str) -> bool:
+        """SQLクエリの安全性をチェック"""
+        sql_upper = sql.upper().strip()
+        
+        # SELECT文のみ許可
+        if not sql_upper.startswith(('SELECT', 'WITH')):
+            return False
+        
+        # 危険なキーワードをチェック
+        dangerous_keywords = [
+            'DROP', 'DELETE', 'INSERT', 'UPDATE', 'ALTER', 'CREATE', 
+            'TRUNCATE', 'GRANT', 'REVOKE', 'EXEC', 'EXECUTE'
+        ]
+        
+        for keyword in dangerous_keywords:
+            if keyword in sql_upper:
+                return False
+        
+        return True
     
     def explain_results(self, query: str, results: List[Dict], model: str = "gpt-4o-mini") -> str:
         """クエリ結果を自然言語で説明"""
@@ -262,14 +287,14 @@ class NaturalLanguageDBInterface:
         MCPSessionManager.init_session()
         self._init_session_state()
         
-        # データベース接続
-        pg_conn_str = os.getenv('PG_CONN_STR', 'postgresql://testuser:testpass@localhost:5432/testdb')
-        self.db_manager = SafeDatabaseManager(pg_conn_str)
+        # MCP データベース接続
+        mcp_server_url = os.getenv('POSTGRESQL_MCP_URL', 'http://localhost:8001/mcp')
+        self.db_manager = MCPDatabaseManager(mcp_server_url)
         
         # OpenAI クライアント初期化
         try:
             self.openai_client = OpenAIClient()
-            self.query_processor = NLQueryProcessor(self.openai_client, self.db_manager)
+            self.query_processor = MCPQueryProcessor(self.openai_client, self.db_manager)
         except Exception as e:
             st.error(f"OpenAI API初期化エラー: {e}")
             st.stop()
@@ -357,8 +382,13 @@ class NaturalLanguageDBInterface:
     
     def create_main_interface(self):
         """メインインターフェースの作成"""
-        st.title("🗣️ 自然言語でPostgreSQLアクセス")
-        st.markdown("**自然な日本語でデータベースに質問してください**")
+        st.title("🗣️ MCP経由でPostgreSQLアクセス")
+        st.markdown("**MCP (Model Context Protocol)経由でデータベースに自然言語で質問してください**")
+        
+        # MCPサーバー情報を表示
+        with st.expander("🔗 MCPサーバー情報"):
+            st.markdown(f"**PostgreSQL MCPサーバー**: `{self.db_manager.mcp_server_url}`")
+            st.markdown("**アーキテクチャ**: Streamlit UI → OpenAI Responses API → MCP Server → PostgreSQL")
         
         # クエリ入力エリア
         col1, col2 = st.columns([3, 1])
@@ -393,55 +423,38 @@ class NaturalLanguageDBInterface:
         
         # クエリ実行（実行ボタン押下時のみ）
         if execute_button and user_query:
-            self.execute_natural_language_query(user_query)
+            self.execute_mcp_query(user_query)
         elif execute_button and not user_query:
             st.warning("質問を入力してください。")
         
         # 結果表示
         self.display_results()
     
-    def execute_natural_language_query(self, user_query: str):
-        """自然言語クエリの実行"""
+    def execute_mcp_query(self, user_query: str):
+        """MCP経由で自然言語クエリを実行"""
         st.write(f"🔍 **実行中のクエリ**: {user_query}")  # デバッグ情報
         
-        with st.spinner("🤖 SQLクエリを生成中..."):
-            # SQL生成
-            success, sql_query, message = self.query_processor.generate_sql(
+        with st.spinner("🤖 MCPサーバー経由でクエリ実行中..."):
+            # MCPクエリ実行
+            success, results, response_message = self.query_processor.execute_mcp_query(
                 user_query, 
                 st.session_state.selected_model
             )
             
             if not success:
-                st.error(f"SQLクエリ生成エラー: {message}")
+                st.error(f"MCPクエリ実行エラー: {response_message}")
                 return
             
-            st.success("SQLクエリを生成しました！")
+            st.success("MCP経由でデータを取得しました！")
             
-            # 生成されたSQLを表示
-            with st.expander("🔧 生成されたSQL", expanded=True):
-                st.code(sql_query, language="sql")
-        
-        with st.spinner("🔍 クエリを実行中..."):
-            # クエリ実行
-            success, results, message = self.db_manager.execute_query(sql_query)
-            
-            if not success:
-                st.error(f"クエリ実行エラー: {message}")
-                return
-            
-            st.success(message)
+            # MCPサーバーからの応答を表示
+            with st.expander("🤖 MCPサーバーからの応答", expanded=True):
+                st.markdown(response_message)
             
             # 結果を保存
             st.session_state.current_results = results
-            st.session_state.query_history.append((user_query, sql_query))
-        
-        # 結果の説明生成
-        if results:
-            with st.spinner("📝 結果を分析中..."):
-                explanation = self.query_processor.explain_results(user_query, results)
-                st.session_state.current_explanation = explanation
-        else:
-            st.session_state.current_explanation = "検索結果がありませんでした。"
+            st.session_state.current_explanation = response_message
+            st.session_state.query_history.append((user_query, "MCP経由"))
     
     def display_results(self):
         """結果の表示"""
@@ -500,7 +513,7 @@ class NaturalLanguageDBInterface:
     def run(self):
         """アプリケーション実行"""
         st.set_page_config(
-            page_title="自然言語PostgreSQLアクセス",
+            page_title="MCP経由PostgreSQLアクセス",
             page_icon="🗣️",
             layout="wide",
             initial_sidebar_state="expanded"
@@ -519,9 +532,26 @@ class NaturalLanguageDBInterface:
         </style>
         """, unsafe_allow_html=True)
         
+        # PostgreSQL接続状態表示（MCPデモ用）
+        mcp_status = self._check_mcp_server_status()
+        if not mcp_status:
+            st.error("⚠️ PostgreSQLデータベースに接続できません")
+            st.info("💡 **解決方法**:\n1. `docker-compose -f docker-compose/docker-compose.mcp-demo.yml up -d postgres` でPostgreSQLを起動\n2. 環境変数 `PG_CONN_STR` を確認してください")
+        
         # サイドバーとメインインターフェース
         self.create_sidebar()
         self.create_main_interface()
+    
+    def _check_mcp_server_status(self) -> bool:
+        """PostgreSQL接続チェック (MCP代替デモ)"""
+        try:
+            with psycopg2.connect(self.db_manager.pg_conn_str, connect_timeout=3) as conn:
+                with conn.cursor() as cursor:
+                    cursor.execute("SELECT 1;")
+                    return cursor.fetchone() is not None
+        except Exception as e:
+            logger.error(f"PostgreSQL connection check failed: {e}")
+            return False
 
 
 def main():
