@@ -91,11 +91,9 @@ class MCPAPIClient:
 
     def get_customers(self, city: Optional[str] = None, limit: int = 100) -> List[Dict]:
         """顧客一覧を取得
-
         Args:
             city: 都市名でフィルタ（オプション）
             limit: 取得件数上限（デフォルト: 100）
-
         Returns:
             顧客データのリスト
         """
@@ -107,10 +105,8 @@ class MCPAPIClient:
 
     def get_customer(self, customer_id: int) -> Dict:
         """特定の顧客を取得
-
         Args:
             customer_id: 顧客ID
-
         Returns:
             顧客データ
         """
@@ -118,12 +114,10 @@ class MCPAPIClient:
 
     def create_customer(self, name: str, email: str, city: str) -> Dict:
         """新規顧客を作成
-
         Args:
             name: 顧客名
             email: メールアドレス
             city: 都市名
-
         Returns:
             作成された顧客データ
         """
@@ -143,13 +137,11 @@ class MCPAPIClient:
                      max_price: Optional[float] = None,
                      limit: int = 100) -> List[Dict]:
         """商品一覧を取得
-
         Args:
             category: カテゴリでフィルタ（オプション）
             min_price: 最低価格（オプション）
             max_price: 最高価格（オプション）
             limit: 取得件数上限（デフォルト: 100）
-
         Returns:
             商品データのリスト
         """
@@ -165,10 +157,8 @@ class MCPAPIClient:
 
     def get_product(self, product_id: int) -> Dict:
         """特定の商品を取得
-
         Args:
             product_id: 商品ID
-
         Returns:
             商品データ
         """
@@ -182,12 +172,10 @@ class MCPAPIClient:
                    product_name: Optional[str] = None,
                    limit: int = 100) -> List[Dict]:
         """注文一覧を取得
-
         Args:
             customer_id: 顧客IDでフィルタ（オプション）
             product_name: 商品名でフィルタ（オプション）
             limit: 取得件数上限（デフォルト: 100）
-
         Returns:
             注文データのリスト（顧客情報含む）
         """
@@ -203,14 +191,12 @@ class MCPAPIClient:
                      quantity: int, price: float,
                      order_date: Optional[str] = None) -> Dict:
         """新規注文を作成
-
         Args:
             customer_id: 顧客ID
             product_name: 商品名
             quantity: 数量
             price: 価格
             order_date: 注文日（YYYY-MM-DD形式、オプション）
-
         Returns:
             作成された注文データ
         """

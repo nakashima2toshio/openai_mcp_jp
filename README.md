@@ -1,51 +1,31 @@
-### Start Server
-docker-compose起動 →
-[各サーバの起動、データの確認]
-streamlit run openai_api_mcp_sample.py --server.port=8501
+### setupドキュメントは下記。
 
-[各サーバのヘルスチェック]
-streamlit run mcp_api_streamlit_app.py --server.port=8502
+[README_setup.md](./README_setup.md)
 
-[各サーバーの起動：FastAPI]
-python mcp_api_server.py
+### 自然言語で各種サーバを利用する＝MCPサーバー:投入データの確認
 
-[各サーバーへクライアントからのアクセス]
-python mcp_api_client.py
-
-./setup_env.sh →
-python setup_api.py →
-python mcp_api_server.py
-uv run streamlit run a_mcp_sample.py --server.port=8501
-
-
-cd docker-compose
-
-[docker-compose Stop]
-docker-compose -f docker-compose.mcp-demo.yml down
-
-[docker-compose start]
-docker-compose -f docker-compose.mcp-demo.yml up -d
-
-[docker-compose ps]
-docker-compose -f docker-compose.mcp-demo.yml ps
-
-### 自然言語で各種サーバを利用する＝MCPサーバー
 ![start_img.png](assets/start_img.png)
+
+### [MCP] PostgreSQL
+
+![postgresql_image.png](assets/postgresql_image.png)
+
 ### 🎯 実装した主要機能(PostgeSQL MCP)
 
-| エンドポイント | メソッド | 説明 |
-|---|---|---|
-| / | GET | API情報 |
-| /health | GET | ヘルスチェック |
-| /api/customers | GET | 顧客一覧（都市フィルタ対応） |
-| /api/customers/{id} | GET | 特定顧客取得 |
-| /api/customers | POST | 新規顧客作成 |
-| /api/products | GET | 商品一覧（カテゴリ・価格フィルタ） |
-| /api/products/{id} | GET | 特定商品取得 |
-| /api/orders | GET | 注文一覧（顧客・商品フィルタ） |
-| /api/orders | POST | 新規注文作成 |
-| /api/stats/sales | GET | 売上統計 |
-| /api/stats/customers/{id}/orders | GET | 顧客別統計 |
+
+| エンドポイント                   | メソッド | 説明                               |
+| -------------------------------- | -------- | ---------------------------------- |
+| /                                | GET      | API情報                            |
+| /health                          | GET      | ヘルスチェック                     |
+| /api/customers                   | GET      | 顧客一覧（都市フィルタ対応）       |
+| /api/customers/{id}              | GET      | 特定顧客取得                       |
+| /api/customers                   | POST     | 新規顧客作成                       |
+| /api/products                    | GET      | 商品一覧（カテゴリ・価格フィルタ） |
+| /api/products/{id}               | GET      | 特定商品取得                       |
+| /api/orders                      | GET      | 注文一覧（顧客・商品フィルタ）     |
+| /api/orders                      | POST     | 新規注文作成                       |
+| /api/stats/sales                 | GET      | 売上統計                           |
+| /api/stats/customers/{id}/orders | GET      | 顧客別統計                         |
 
 ## OpenAI Responses API × MCP（Model Context Protocol）
 
@@ -54,6 +34,7 @@ docker-compose -f docker-compose.mcp-demo.yml ps
 - pip install -r requirements.txt
 
 > **重要:**
+
 - OpenAI **Responses API** から MCP を使うには、
 - `server_url` で到達できる **Remote MCP（HTTP / SSE）** としてサーバを公開する必要があります。
 - `stdio` 専用の MCP はそのままでは使えません

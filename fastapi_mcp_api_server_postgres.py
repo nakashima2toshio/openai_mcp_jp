@@ -1,5 +1,5 @@
 # MCP API クライアントの9つのデモ機能をStreamlit化
-# streamlit run fastapi_mcp_api_server_postgres.py --server.port=8502
+# streamlit run fastapi_mcp_api_server_postgres.py --server.port=8503
 
 import streamlit as st
 import os
@@ -107,11 +107,12 @@ class MCPDemoApplication:
         st.sidebar.markdown("### ℹ️ 情報")
 
         # 開発者向け情報
-        if st.sidebar.expander("🛠️ 開発者情報"):
-                st.write("Toshioakashima")
-            st.sidebar.code(f"API URL: {self.api_base_url}")
-            st.sidebar.code(f"接続状態: {st.session_state.api_connected}")
-            st.sidebar.code(f"選択ページ: {st.session_state.selected_demo_page}")
+        with st.sidebar.expander("🛠️ 開発者情報", expanded=False):
+            st.code("Toshio　Nakashima: nakashima2toshio@gmail.com")
+        with st.sidebar.expander("🛠️ API情報", expanded=False):
+            st.code(f"API URL: {self.api_base_url}")
+            st.code(f"接続状態: {st.session_state.api_connected}")
+            st.code(f"選択ページ: {st.session_state.selected_demo_page}")
     
     def render_main_content(self):
         """メインコンテンツの描画"""
