@@ -1,5 +1,5 @@
 # mcp_postgresql.py - MCP経由で自然言語でPostgreSQLにアクセスするStreamlitアプリ
-# streamlit run mcp_postgresql.py --server.port=8504
+# streamlit run mcp_postgresql.py --server.port=8502
 # 前提: PostgreSQL MCP サーバーがポート8001で起動している必要があります
 
 import streamlit as st
