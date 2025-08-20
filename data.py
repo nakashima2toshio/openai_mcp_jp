@@ -461,7 +461,7 @@ def main():
         print("🎉 全てのデータ投入が成功しました!")
         print("\n次のステップ:")
         print("1. サーバー起動: python server.py")
-        print("2. アプリ起動: streamlit run openai_api_mcp_sample.py")
+        print("2. アプリ起動: streamlit run mcp_db_show_data.py")
     else:
         print("⚠️ 一部のデータ投入に失敗しました")
         print("Dockerサービスが起動しているか確認してください:")

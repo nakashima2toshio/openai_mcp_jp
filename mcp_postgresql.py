@@ -383,6 +383,100 @@ class NaturalLanguageDBInterface:
     def create_main_interface(self):
         """メインインターフェースの作成"""
         st.title("🗣️ MCP経由でPostgreSQLアクセス")
+        with st.expander("🔗 OpenAI API 部分"):
+            st.code("""
+            
+  Input (入力)
+
+  # Line 156-162: OpenAI API レスポンス作成
+  response = self.openai_client.create_response(
+      input=[
+          {"role": "system", "content":
+  "あなたはSQL生成の専門家です。安全で効率的なPostgreSQLクエリを生成してください。"},
+          {"role": "user", "content": sql_prompt}
+      ],
+      model=model
+  )
+
+  # Line 261-264: 結果説明用 OpenAI API 呼び出し
+  response = self.openai_client.create_response(
+      input=messages,
+      model=model
+  )
+
+  Process (処理)
+
+  # Line 137-176: AI によるSQL生成処理
+  def _generate_sql_via_ai(self, user_query: str, model: str) -> Tuple[str, str]:
+      # スキーマ情報を含むプロンプト構築
+      sql_prompt = f"以下のデータベーススキーマに基づいて、ユーザーの質問に対応するPostgreSQLクエリを生成してください。
+  【データベーススキーマ】{schema_text}
+  【制約】- SELECT文のみ生成してください
+  【質問】: {user_query}"
+
+      # OpenAI API でSQL生成
+      response = self.openai_client.create_response(...)
+
+      # レスポンス処理
+      texts = ResponseProcessor.extract_text(response)
+      sql_query = self._clean_sql_query(texts[0])
+
+  Output (出力)
+    
+      # Line 164-172: OpenAI レスポンスからテキスト抽出・クリーンアップ
+      from helper_api import ResponseProcessor
+      texts = ResponseProcessor.extract_text(response)
+      if texts:
+          sql_query = self._clean_sql_query(texts[0])
+          explanation = f"質問『{user_query}』に対応するSQLを生成しました。"
+          return sql_query, explanation
+            """)
+        with st.expander("🔗 MCP (Model Context Protocol) 部分"):
+            st.code("""
+            
+  Input (入力)
+
+  # Line 78-100: MCPプロンプト構築
+  def build_mcp_prompt(self, user_query: str) -> List[Dict[str, str]]:
+      system_prompt = f"あなたはPostgreSQL MCPサーバーと連携するアシスタントです。
+  【データベーススキーマ】{schema_text}
+  【MCP操作について】
+  - PostgreSQL MCPサーバーが利用可能です
+  - SELECT操作のみ安全に実行可能です
+  - 結果はJSON形式で返されます"
+
+      return [
+          {"role": "system", "content": system_prompt},
+          {"role": "user", "content": user_query}
+      ]
+
+  Process (処理)
+
+  # Line 113-135: MCPクエリ実行処理（デモ版）
+  def execute_mcp_query(self, user_query: str, model: str = "gpt-5-mini") -> Tuple[bool, List[Dict], str]:
+      # Step 1: AI でSQL生成 (MCP概念のデモ)
+      sql_query, explanation = self._generate_sql_via_ai(user_query, model)
+
+      # Step 2: PostgreSQLで直接実行 (MCPサーバー代替)
+      results = self._execute_sql_directly(sql_query)
+
+      # Step 3: 結果の説明生成
+      response_text = f"**生成されたSQL**: `{sql_query}`\n\n**実行結果**: {len(results)}件のデータを取得しました。"
+
+  Output (出力)
+
+  # Line 192-210: 安全なSQL実行とJSONレスポンス
+  def _execute_sql_directly(self, sql_query: str) -> List[Dict]:
+      with psycopg2.connect(
+          self.db_manager.pg_conn_str,
+          cursor_factory=psycopg2.extras.RealDictCursor
+      ) as conn:
+          with conn.cursor() as cursor:
+              cursor.execute(sql_query)
+              results = cursor.fetchall()
+              return [dict(row) for row in results]  # JSON形式で返却
+            """)
+
         st.markdown("**MCP (Model Context Protocol)経由でデータベースに自然言語で質問してください**")
         
         # MCPサーバー情報を表示

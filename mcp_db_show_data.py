@@ -1,5 +1,6 @@
-# streamlit run openai_api_mcp_sample.py --server.port=8501
+# streamlit run mcp_db_show_data.py --server.port=8501
 # 簡素化されたメインファイル（50行程度）
+
 import streamlit as st
 import os
 from dotenv import load_dotenv
@@ -23,7 +24,7 @@ def main():
 
     # ヘッダー
     st.write("docker-compose起動後")
-    st.write("streamlit run openai_api_mcp_sample.py --server.port=8501")
+    st.write("streamlit run mcp_db_show_data.py --server.port=8501")
     st.markdown("<h5>🤖 MCP サーバー × OpenAI API デモ</h5>", unsafe_allow_html=True)
     st.markdown("---")
 
@@ -80,4 +81,4 @@ def main():
 if __name__ == "__main__":
     main()
 
-# streamlit run openai_api_mcp_sample.py --server.port=8501
+# streamlit run mcp_db_show_data.py --server.port=8501

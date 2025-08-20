@@ -1,5 +1,26 @@
-docker-compose の立ち上げ。
 
+setup.py
+data.py
+server.py
+
+mcp_db_show_data.py
+mcp_elasticsearch.py
+mcp_postgresql.py
+mcp_qdrant.py
+
+fastapi_mcp_api_server_postgres.py
+helper_api.py
+helper_mcp.py
+helper_mcp_pages.py
+helper_st.py
+
+-------------------------------
+PostgreSQL: mcp_postgresql.py
+
+Redis:          mcp_redis.py
+Elasticsearch:  mcp_Elasticsearch.py
+Qdrant:         mcp_qdrant.py
+docker-compose の立ち上げ。
 docker-compose -f docker-compose.mcp-demo.yml up -d
 
 # ----------------------------------------------

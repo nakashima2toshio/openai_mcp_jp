@@ -1,8 +1,4 @@
 
-setup_api.py
-setup_env.sh
-setup_sample_data.py
-setup_test_data.py
 
 
 ### 1. 環境セットアップ

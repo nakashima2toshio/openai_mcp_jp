@@ -203,5 +203,5 @@ if __name__ == "__main__":
     print("\n💡 使用方法:")
     print("1. Dockerサービスを起動: docker-compose -f docker-compose.mcp-demo.yml up -d")
     print("2. このスクリプトを実行: python setup_sample_data.py")
-    print("3. Streamlitアプリを起動: streamlit run openai_api_mcp_sample.py")
+    print("3. Streamlitアプリを起動: streamlit run mcp_db_show_data.py")
 
