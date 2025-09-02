@@ -1,4 +1,4 @@
-# docker-compose.mcp-simple.yml - MCP PostgreSQL デモ用最小構成
+# docker-compose.mcp-postgres.yml - MCP PostgreSQL デモ用最小構成
 version: '3.8'
 
 services:

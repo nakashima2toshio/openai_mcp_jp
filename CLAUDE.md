@@ -174,3 +174,4 @@ Key dependencies from pyproject.toml:
 
 ### Python Version
 Requires Python >=3.12.2
+```

@@ -4,5 +4,5 @@ docker-compose -f docker-compose.mcp-demo.yml down
 [docker-compose start]
 docker-compose -f docker-compose.mcp-demo.yml up -d
 
-[New]
-docker-compose -f docker-compose.mcp-simple.yml up -d
+[New-only-PostgreSQL]
+docker-compose -f docker-compose.mcp-postgres.yml up -d
